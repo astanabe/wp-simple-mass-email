@@ -122,7 +122,7 @@ function wp_simple_mass_email_send_email_page_screen() {
 				}
 				else {
 					wp_simple_mass_email_display_admin_notice('Recipient role "' . $role_key . '" is invalid.', 'error');
-					wp_redirect(wp_get_referer());
+					wp_safe_redirect(wp_get_referer());
 					exit;
 				}
 			}
@@ -135,7 +135,7 @@ function wp_simple_mass_email_send_email_page_screen() {
 					}
 					else {
 						wp_simple_mass_email_display_admin_notice('Recipient group "' . $group_id . '" is invalid.', 'error');
-						wp_redirect(wp_get_referer());
+						wp_safe_redirect(wp_get_referer());
 						exit;
 					}
 				}
@@ -144,17 +144,17 @@ function wp_simple_mass_email_send_email_page_screen() {
 			$batch_size = sanitize_text_field($_POST['email_batch_size']);
 			if (empty($subject) || empty($body) || empty($batch_size) || (empty($roles) && empty($group_ids))) {
 				wp_simple_mass_email_display_admin_notice('Email subject, body, batch size and recipient roles or groups are required.', 'error');
-				wp_redirect(wp_get_referer());
+				wp_safe_redirect(wp_get_referer());
 				exit;
 			}
 			if (!empty($roles) && !empty($group_ids)) {
 				wp_simple_mass_email_display_admin_notice('Both recipient roles and groups are given but this is invalid.', 'error');
-				wp_redirect(wp_get_referer());
+				wp_safe_redirect(wp_get_referer());
 				exit;
 			}
 			if ($batch_size < 10 || $batch_size > 10000) {
 				wp_simple_mass_email_display_admin_notice('Batch size "' . $batch_size . '" is invalid.', 'error');
-				wp_redirect(wp_get_referer());
+				wp_safe_redirect(wp_get_referer());
 				exit;
 			}
 			echo '<h2>Confirm Email</h2>';
@@ -220,7 +220,7 @@ function wp_simple_mass_email_send_email_page_screen() {
 					}
 					else {
 						wp_simple_mass_email_display_admin_notice('Recipient role "' . $role_key . '" is invalid.', 'error');
-						wp_redirect(wp_get_referer());
+						wp_safe_redirect(wp_get_referer());
 						exit;
 					}
 				}
@@ -233,7 +233,7 @@ function wp_simple_mass_email_send_email_page_screen() {
 						}
 						else {
 							wp_simple_mass_email_display_admin_notice('Recipient group "' . $group_id . '" is invalid.', 'error');
-							wp_redirect(wp_get_referer());
+							wp_safe_redirect(wp_get_referer());
 							exit;
 						}
 					}
@@ -242,17 +242,17 @@ function wp_simple_mass_email_send_email_page_screen() {
 				$batch_size = sanitize_text_field($_POST['email_batch_size']);
 				if (empty($subject) || empty($body) || empty($batch_size) || (empty($roles) && empty($group_ids))) {
 					wp_simple_mass_email_display_admin_notice('Email subject, body, batch size and recipient roles or groups are required.', 'error');
-					wp_redirect(wp_get_referer());
+					wp_safe_redirect(wp_get_referer());
 					exit;
 				}
 				if (!empty($roles) && !empty($group_ids)) {
 					wp_simple_mass_email_display_admin_notice('Both recipient roles and groups are given but this is invalid.', 'error');
-					wp_redirect(wp_get_referer());
+					wp_safe_redirect(wp_get_referer());
 					exit;
 				}
 				if ($batch_size < 10 || $batch_size > 10000) {
 					wp_simple_mass_email_display_admin_notice('Batch size "' . $batch_size . '" is invalid.', 'error');
-					wp_redirect(wp_get_referer());
+					wp_safe_redirect(wp_get_referer());
 					exit;
 				}
 				echo '<h2>Edit Email</h2>';
