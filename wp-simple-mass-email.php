@@ -256,7 +256,11 @@ function wp_simple_mass_email_send_email_page_screen() {
 					exit;
 				}
 				echo '<h2>Edit Email</h2>';
-				echo '<p>Input the email message sent to users.</p><p>The following variables can be used in email subject.</p><ul><li>{user_login}</li><li>{site_title}</li></ul><p>The following variables can be used in email body.</p><ul><li>{user_login}</li><li>{user_email}</li><li>{login_url}</li><li>{home_url}</li><li>{profile_url}</li><li>{site_title}</li><li>{resetpass_url}</li></ul>';
+				echo '<p>Input the email message sent to users.</p><p>The following variables can be used in email subject.</p><ul><li>{user_login}</li><li>{site_title}</li></ul><p>The following variables can be used in email body.</p><ul><li>{user_login}</li><li>{user_email}</li><li>{login_url}</li><li>{home_url}</li>';
+				if (function_exists('bp_members_get_user_url')) {
+					echo '<li>{profile_url}</li>';
+				}
+				echo '<li>{site_title}</li><li>{resetpass_url}</li></ul>';
 				echo '<form method="post">';
 				wp_nonce_field('wp_simple_mass_email_confirm_send_email', 'wp_simple_mass_email_confirm_send_email_nonce');
 				echo '<table class="form-table">
@@ -311,7 +315,11 @@ function wp_simple_mass_email_send_email_page_screen() {
 			}
 			else {
 				echo '<h2>Input Email</h2>';
-				echo '<p>Input the email message sent to users.</p><p>The following variables can be used in email subject.</p><ul><li>{user_login}</li><li>{site_title}</li></ul><p>The following variables can be used in email body.</p><ul><li>{user_login}</li><li>{user_email}</li><li>{login_url}</li><li>{home_url}</li><li>{profile_url}</li><li>{site_title}</li><li>{resetpass_url}</li></ul>';
+				echo '<p>Input the email message sent to users.</p><p>The following variables can be used in email subject.</p><ul><li>{user_login}</li><li>{site_title}</li></ul><p>The following variables can be used in email body.</p><ul><li>{user_login}</li><li>{user_email}</li><li>{login_url}</li><li>{home_url}</li>';
+				if (function_exists('bp_members_get_user_url')) {
+					echo '<li>{profile_url}</li>';
+				}
+				echo '<li>{site_title}</li><li>{resetpass_url}</li></ul>';
 				echo '<form method="post">';
 				wp_nonce_field('wp_simple_mass_email_confirm_send_email', 'wp_simple_mass_email_confirm_send_email_nonce');
 				echo '<table class="form-table">
@@ -550,7 +558,9 @@ function wp_simple_mass_email_send_email_cron() {
 		if ($user) {
 			$login_url = wp_login_url();
 			$home_url = home_url();
-			$profile_url = bp_members_get_user_url($recipient->user_id);
+			if (function_exists('bp_members_get_user_url')) {
+				$profile_url = bp_members_get_user_url($recipient->user_id);
+			}
 			$site_title = get_bloginfo('name');
 			$subject = str_replace(
 				['{user_login}', '{site_title}'],
@@ -558,10 +568,13 @@ function wp_simple_mass_email_send_email_cron() {
 				$current_job->subject
 			);
 			$body = str_replace(
-				['{user_login}', '{user_email}', '{login_url}', '{home_url}', '{profile_url}', '{site_title}'],
-				[$user->user_login, $user->user_email, $login_url, $home_url, $profile_url, $site_title],
+				['{user_login}', '{user_email}', '{login_url}', '{home_url}', '{site_title}'],
+				[$user->user_login, $user->user_email, $login_url, $home_url, $site_title],
 				$current_job->body
 			);
+			if (isset($profile_url)) {
+				$body = str_replace('{profile_url}', $profile_url, $body);
+			}
 			if ($contains_resetpass_url) {
 				$key = get_password_reset_key($user);
 				$resetpass_url = add_query_arg(
