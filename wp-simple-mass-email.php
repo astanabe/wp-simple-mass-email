@@ -636,7 +636,7 @@ function wp_simple_mass_email_get_user_ids_by_group_ids($group_ids, $batch_size 
     return $user_ids;
 }
 
-// Get all groups
+// Get all groups (max: 999)
 function wp_simple_mass_email_get_all_groups() {
     if (!function_exists('bp_has_groups')) {
         return [];
