@@ -61,13 +61,13 @@ register_deactivation_hook(__FILE__, 'wp_simple_mass_email_delete_email_tables')
 
 // Function to display admin notice
 function wp_simple_mass_email_display_admin_notice($message, $type = 'success') {
-    wp_admin_notice(
-        $message,
-        [
-            'type'    => $type, // 'success', 'error', 'warning', 'info'
-            'dismiss' => true,
-        ]
-    );
+	wp_admin_notice(
+		$message,
+			[
+				'type'    => $type, // 'success', 'error', 'warning', 'info'
+				'dismiss' => true,
+			]
+	);
 }
 
 // Add "Mass Email" submenu to "Settings" menu of dashboard
@@ -366,11 +366,11 @@ function wp_simple_mass_email_send_email_page_screen() {
 
 // Add custom schedules
 function wp_simple_mass_email_add_cron_schedules($schedules) {
-    $schedules['wp_simple_mass_email_every_ten_minutes'] = [
-        'interval' => 600, // = 10 minutes
-        'display'  => __('Every 10 Minutes')
-    ];
-    return $schedules;
+	$schedules['wp_simple_mass_email_every_ten_minutes'] = [
+		'interval' => 600, // = 10 minutes
+		'display'  => __('Every 10 Minutes')
+	];
+	return $schedules;
 }
 add_filter('cron_schedules', 'wp_simple_mass_email_add_cron_schedules');
 
@@ -496,16 +496,16 @@ function wp_simple_mass_email_perform_send_email() {
 			}
 			$insert_user_ids = [];
 			if ($unlogged_only) {
-		        $wp_user_query = new WP_User_Query([
-		            'include'    => $user_ids,
-		            'fields'     => 'ID',
-		            'meta_query' => [
-		                [
-		                    'key'     => 'last_login',
-		                    'compare' => 'NOT EXISTS'
-		                ]
-		            ]
-		        ]);
+				$wp_user_query = new WP_User_Query([
+					'include'    => $user_ids,
+					'fields'     => 'ID',
+					'meta_query' => [
+						[
+							'key'     => 'last_login',
+							'compare' => 'NOT EXISTS'
+						]
+					]
+				]);
 				$insert_user_ids = $wp_user_query->get('ID');
 			}
 			else {
@@ -623,30 +623,30 @@ function wp_simple_mass_email_get_users_by_roles($roles, $unlogged_only, $batch_
 
 // Get users by groups
 function wp_simple_mass_email_get_user_ids_by_group_ids($group_ids, $batch_size = 10000, $page = 1) {
-    $args = [
-        'group_id'  => $group_ids,
-        'per_page'  => $batch_size,
-        'page'      => $page
-    ];
-    $bp_user_query = new BP_User_Query($args);
-    $user_ids = $bp_user_query->user_ids;
-    if (empty($user_ids)) {
-        return [];
-    }
-    return $user_ids;
+	$args = [
+		'group_id'  => $group_ids,
+		'per_page'  => $batch_size,
+		'page'      => $page
+	];
+	$bp_user_query = new BP_User_Query($args);
+	$user_ids = $bp_user_query->user_ids;
+	if (empty($user_ids)) {
+		return [];
+	}
+	return $user_ids;
 }
 
 // Get all groups (max: 999)
 function wp_simple_mass_email_get_all_groups() {
-    if (!function_exists('bp_has_groups')) {
-        return [];
-    }
-    $groups = [];
-    if (bp_has_groups(['per_page' => 999, 'orderby' => 'total_member_count', 'order' => 'DESC'])) {
-        while (bp_groups()) {
-            bp_the_group();
-            $groups[] = ['id' => bp_get_group_id(), 'name' => bp_get_group_name()];
-        }
-    }
-    return $groups;
+	if (!function_exists('bp_has_groups')) {
+		return [];
+	}
+	$groups = [];
+	if (bp_has_groups(['per_page' => 999, 'orderby' => 'total_member_count', 'order' => 'DESC'])) {
+		while (bp_groups()) {
+			bp_the_group();
+			$groups[] = ['id' => bp_get_group_id(), 'name' => bp_get_group_name()];
+		}
+	}
+	return $groups;
 }
