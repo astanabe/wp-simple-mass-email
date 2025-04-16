@@ -86,6 +86,7 @@ add_action('admin_menu', 'wp_simple_mass_email_add_send_email_to_dashboard');
 function wp_simple_mass_email_send_email_page_screen() {
 	global $wpdb;
 	$table_content = $wpdb->prefix . 'wp_simple_mass_email_email_content';
+	$table_recipients = $wpdb->prefix . 'wp_simple_mass_email_email_recipients';
 	$current_job = $wpdb->get_row("SELECT * FROM $table_content LIMIT 1");
 	$is_sending = $current_job && ($current_job->status === 'active');
 	$is_paused = $current_job && ($current_job->status === 'paused');
@@ -97,6 +98,22 @@ function wp_simple_mass_email_send_email_page_screen() {
 		wp_nonce_field('wp_simple_mass_email_pause_send_email', 'wp_simple_mass_email_pause_send_email_nonce');
 		echo '<input type="hidden" name="wp_simple_mass_email_pause_send_email" value="1">';
 		echo '<p><input type="submit" class="button button-warning" value="Pause Sending"></p></form>';
+		echo '<table class="form-table">
+			<tr><th>Email Subject:</th><td><strong>' . esc_html($current_job->subject) . '</strong></td></tr>
+			<tr><th>Email Body:</th><td><pre>' . esc_html($current_job->body) . '</pre></td></tr>';
+		echo '<tr><th>Sending batch size every 10 min:</th><td><strong>' . esc_html($current_job->batch_size) . '</strong></td></tr>';
+		$recipients = $wpdb->get_results("SELECT user_id FROM $table_recipients LIMIT $current_job->batch_size");
+		$user_ids = wp_list_pluck($recipients, 'user_id');
+		$args = [
+			'include' => $user_ids,
+			'fields'  => 'user_login',
+		];
+		$wp_user_query = new WP_User_Query($args);
+		$user_logins = $wp_user_query->get_results();
+		if (!empty($user_logins)) {
+			echo '<tr><th>Recipient User(s) of next batch:</th><td><strong>' . implode('</strong><br /><strong>', $user_logins) . '</strong></td></tr>';
+		}
+		echo '</table>';
 	}
 	else if ($is_paused) {
 		echo '<h2>Pausing Sending Emails...</h2>';
@@ -109,11 +126,27 @@ function wp_simple_mass_email_send_email_page_screen() {
 		wp_nonce_field('wp_simple_mass_email_cancel_send_email', 'wp_simple_mass_email_cancel_send_email_nonce');
 		echo '<input type="hidden" name="wp_simple_mass_email_cancel_send_email" value="1">';
 		echo '<p><input type="submit" class="button button-danger" value="Cancel Sending"></p></form>';
+		echo '<table class="form-table">
+			<tr><th>Email Subject:</th><td><strong>' . esc_html($current_job->subject) . '</strong></td></tr>
+			<tr><th>Email Body:</th><td><pre>' . esc_html($current_job->body) . '</pre></td></tr>';
+		echo '<tr><th>Sending batch size every 10 min:</th><td><strong>' . esc_html($current_job->batch_size) . '</strong></td></tr>';
+		$recipients = $wpdb->get_results("SELECT user_id FROM $table_recipients LIMIT $current_job->batch_size");
+		$user_ids = wp_list_pluck($recipients, 'user_id');
+		$args = [
+			'include' => $user_ids,
+			'fields'  => 'user_login',
+		];
+		$wp_user_query = new WP_User_Query($args);
+		$user_logins = $wp_user_query->get_results();
+		if (!empty($user_logins)) {
+			echo '<tr><th>Recipient User(s) of next batch:</th><td><strong>' . implode('</strong><br /><strong>', $user_logins) . '</strong></td></tr>';
+		}
+		echo '</table>';
 	}
 	else {
 		if (isset($_POST['wp_simple_mass_email_confirm_send_email']) && check_admin_referer('wp_simple_mass_email_confirm_send_email', 'wp_simple_mass_email_confirm_send_email_nonce')) {
-			$subject = sanitize_text_field($_POST['email_subject']);
-			$body = sanitize_textarea_field($_POST['email_body']);
+			$subject = sanitize_text_field(wp_unslash($_POST['email_subject']));
+			$body = sanitize_textarea_field(wp_unslash($_POST['email_body']));
 			$roles = [];
 			foreach ($_POST['email_recipient_roles'] as $role_key) {
 				$role_key = sanitize_text_field($role_key);
@@ -210,8 +243,8 @@ function wp_simple_mass_email_send_email_page_screen() {
 		}
 		else {
 			if (isset($_POST['wp_simple_mass_email_edit_send_email']) && check_admin_referer('wp_simple_mass_email_edit_send_email', 'wp_simple_mass_email_edit_send_email_nonce')) {
-				$subject = sanitize_text_field($_POST['email_subject']);
-				$body = sanitize_textarea_field($_POST['email_body']);
+				$subject = sanitize_text_field(wp_unslash($_POST['email_subject']));
+				$body = sanitize_textarea_field(wp_unslash($_POST['email_body']));
 				$roles = [];
 				foreach ($_POST['email_recipient_roles'] as $role_key) {
 					$role_key = sanitize_text_field($role_key);
@@ -407,8 +440,8 @@ function wp_simple_mass_email_perform_send_email() {
 	if (!isset($_POST['wp_simple_mass_email_perform_send_email']) || !check_admin_referer('wp_simple_mass_email_perform_send_email', 'wp_simple_mass_email_perform_send_email_nonce')) {
 		return;
 	}
-	$subject = sanitize_text_field($_POST['email_subject']);
-	$body = sanitize_textarea_field($_POST['email_body']);
+	$subject = sanitize_text_field(wp_unslash($_POST['email_subject']));
+	$body = sanitize_textarea_field(wp_unslash($_POST['email_body']));
 	$roles = [];
 	foreach ($_POST['email_recipient_roles'] as $role_key) {
 		$role_key = sanitize_text_field($role_key);
@@ -462,26 +495,26 @@ function wp_simple_mass_email_perform_send_email() {
 	$total_users = 0;
 	if (!empty($roles)) {
 		do {
-			$users = wp_simple_mass_email_get_users_by_roles($roles, $unlogged_only, 10000, $page);
-			if (empty($users)) {
-				$new_users = wp_simple_mass_email_get_users_by_roles($roles, $unlogged_only, 10000, $page + 1);
-				if (!empty($new_users)) {
-					$users = $new_users;
+			$user_ids = wp_simple_mass_email_get_user_ids_by_roles($roles, $unlogged_only, 10000, $page);
+			if (empty($user_ids)) {
+				$new_user_ids = wp_simple_mass_email_get_user_ids_by_roles($roles, $unlogged_only, 10000, $page + 1);
+				if (!empty($new_user_ids)) {
+					$user_ids = $new_user_ids;
 				} else {
 					break;
 				}
 			}
 			$values = [];
 			$placeholders = [];
-			foreach ($users as $user) {
-				$values[] = $user->ID;
+			foreach ($user_ids as $user_id) {
+				$values[] = $user_id;
 				$placeholders[] = "(%d)";
 			}
 			$query = "INSERT INTO $table_recipients (user_id) VALUES " . implode(',', $placeholders);
 			$wpdb->query($wpdb->prepare($query, ...$values));
-			$total_users += count($users);
+			$total_users += count($user_ids);
 			$page++;
-		} while (count($users) >= 10000);
+		} while (count($user_ids) >= 10000);
 	}
 	else if (!empty($group_ids)) {
 		do {
@@ -506,7 +539,7 @@ function wp_simple_mass_email_perform_send_email() {
 						]
 					]
 				]);
-				$insert_user_ids = $wp_user_query->get('ID');
+				$insert_user_ids = $wp_user_query->get_results();
 			}
 			else {
 				$insert_user_ids = $user_ids;
@@ -532,7 +565,7 @@ function wp_simple_mass_email_perform_send_email() {
 	if (!wp_next_scheduled('wp_simple_mass_email_email_send')) {
 		wp_schedule_event(time(), 'wp_simple_mass_email_every_ten_minutes', 'wp_simple_mass_email_email_send');
 	}
-	wp_simple_mass_email_display_admin_notice('Email sending started: <strong>' . esc_html($subject) . '</strong> to ' . esc_html($total_users) . ' users.', 'success');
+	wp_simple_mass_email_display_admin_notice('Email sending has been reserved to run: <strong>' . esc_html($subject) . '</strong> to ' . esc_html($total_users) . ' user(s). Email sending will run within 10 minutes. You can pause email sending.', 'success');
 }
 add_action('admin_init', 'wp_simple_mass_email_perform_send_email');
 
@@ -591,8 +624,8 @@ function wp_simple_mass_email_send_email_cron() {
 			usleep($usleep_time);
 		}
 	}
-	$ids = wp_list_pluck($recipients, 'user_id');
-	$wpdb->query("DELETE FROM $table_recipients WHERE user_id IN (" . implode(',', $ids) . ")");
+	$user_ids = wp_list_pluck($recipients, 'user_id');
+	$wpdb->query("DELETE FROM $table_recipients WHERE user_id IN (" . implode(',', $user_ids) . ")");
 	$remaining_users = $wpdb->get_var("SELECT COUNT(*) FROM $table_recipients");
 	if ($remaining_users == 0) {
 		$wpdb->query("DELETE FROM $table_content");
@@ -602,7 +635,7 @@ function wp_simple_mass_email_send_email_cron() {
 add_action('wp_simple_mass_email_email_send', 'wp_simple_mass_email_send_email_cron');
 
 // Get users by roles
-function wp_simple_mass_email_get_users_by_roles($roles, $unlogged_only, $batch_size = 10000, $page = 1) {
+function wp_simple_mass_email_get_user_ids_by_roles($roles, $unlogged_only, $batch_size = 10000, $page = 1) {
 	$args = [
 		'role__in'  => empty($roles) ? null : $roles,
 		'fields'    => 'ID',
@@ -617,8 +650,12 @@ function wp_simple_mass_email_get_users_by_roles($roles, $unlogged_only, $batch_
 			],
 		];
 	}
-	$query = new WP_User_Query($args);
-	return $query->get_results();
+	$wp_user_query = new WP_User_Query($args);
+	$user_ids = $wp_user_query->get_results();
+	if (empty($user_ids)) {
+		return [];
+	}
+	return $user_ids;
 }
 
 // Get users by groups
@@ -628,8 +665,8 @@ function wp_simple_mass_email_get_user_ids_by_group_ids($group_ids, $batch_size 
 		'per_page'  => $batch_size,
 		'page'      => $page
 	];
-	$bp_user_query = new BP_User_Query($args);
-	$user_ids = $bp_user_query->user_ids;
+	$bp_group_member_query = new BP_Group_Member_Query($args);
+	$user_ids = $bp_group_member_query->get_group_member_ids();
 	if (empty($user_ids)) {
 		return [];
 	}
