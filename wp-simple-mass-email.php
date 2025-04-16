@@ -440,8 +440,8 @@ function wp_simple_mass_email_perform_send_email() {
 	if (!isset($_POST['wp_simple_mass_email_perform_send_email']) || !check_admin_referer('wp_simple_mass_email_perform_send_email', 'wp_simple_mass_email_perform_send_email_nonce')) {
 		return;
 	}
-	$subject = sanitize_text_field(wp_unslash($_POST['email_subject']));
-	$body = sanitize_textarea_field(wp_unslash($_POST['email_body']));
+	$subject = wp_specialchars_decode(sanitize_text_field(wp_unslash($_POST['email_subject'])), ENT_QUOTES);
+	$body = wp_specialchars_decode(sanitize_textarea_field(wp_unslash($_POST['email_body'])), ENT_QUOTES);
 	$roles = [];
 	foreach ($_POST['email_recipient_roles'] as $role_key) {
 		$role_key = sanitize_text_field($role_key);
