@@ -602,11 +602,11 @@ function wp_simple_mass_email_send_email_cron() {
 			);
 			$body = str_replace(
 				['{user_login}', '{user_email}', '{login_url}', '{home_url}', '{site_title}'],
-				[$user->user_login, $user->user_email, $login_url, $home_url, $site_title],
+				[$user->user_login, $user->user_email, esc_url($login_url), esc_url($home_url), $site_title],
 				$current_job->body
 			);
 			if (isset($profile_url)) {
-				$body = str_replace('{profile_url}', $profile_url, $body);
+				$body = str_replace('{profile_url}', esc_url($profile_url), $body);
 			}
 			if ($contains_resetpass_url) {
 				$key = get_password_reset_key($user);
@@ -618,7 +618,7 @@ function wp_simple_mass_email_send_email_cron() {
 					],
 					$login_url
 				);
-				$body = str_replace('{resetpass_url}', $resetpass_url, $body);
+				$body = str_replace('{resetpass_url}', esc_url($resetpass_url), $body);
 			}
 			wp_mail($user->user_email, $subject, $body);
 			usleep($usleep_time);
