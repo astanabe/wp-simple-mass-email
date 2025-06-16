@@ -104,6 +104,7 @@ function wp_simple_mass_email_send_email_page_screen() {
 		echo '<tr><th>Sending batch size every 10 min:</th><td><strong>' . esc_html($current_job->batch_size) . '</strong></td></tr>';
 		$recipients = $wpdb->get_results("SELECT user_id FROM $table_recipients LIMIT $current_job->batch_size");
 		$user_ids = wp_list_pluck($recipients, 'user_id');
+		$user_ids = array_unique($user_ids, SORT_NUMERIC);
 		$args = [
 			'include' => $user_ids,
 			'fields'  => 'user_login',
@@ -111,6 +112,7 @@ function wp_simple_mass_email_send_email_page_screen() {
 		$wp_user_query = new WP_User_Query($args);
 		$user_logins = $wp_user_query->get_results();
 		if (!empty($user_logins)) {
+			$user_logins = array_unique($user_logins);
 			echo '<tr><th>Recipient User(s) of next batch:</th><td><strong>' . implode('</strong><br /><strong>', $user_logins) . '</strong></td></tr>';
 		}
 		echo '</table>';
@@ -132,6 +134,7 @@ function wp_simple_mass_email_send_email_page_screen() {
 		echo '<tr><th>Sending batch size every 10 min:</th><td><strong>' . esc_html($current_job->batch_size) . '</strong></td></tr>';
 		$recipients = $wpdb->get_results("SELECT user_id FROM $table_recipients LIMIT $current_job->batch_size");
 		$user_ids = wp_list_pluck($recipients, 'user_id');
+		$user_ids = array_unique($user_ids, SORT_NUMERIC);
 		$args = [
 			'include' => $user_ids,
 			'fields'  => 'user_login',
@@ -139,6 +142,7 @@ function wp_simple_mass_email_send_email_page_screen() {
 		$wp_user_query = new WP_User_Query($args);
 		$user_logins = $wp_user_query->get_results();
 		if (!empty($user_logins)) {
+			$user_logins = array_unique($user_logins);
 			echo '<tr><th>Recipient User(s) of next batch:</th><td><strong>' . implode('</strong><br /><strong>', $user_logins) . '</strong></td></tr>';
 		}
 		echo '</table>';
@@ -497,38 +501,30 @@ function wp_simple_mass_email_perform_send_email() {
 		do {
 			$user_ids = wp_simple_mass_email_get_user_ids_by_roles($roles, $unlogged_only, 10000, $page);
 			if (empty($user_ids)) {
-				$new_user_ids = wp_simple_mass_email_get_user_ids_by_roles($roles, $unlogged_only, 10000, $page + 1);
-				if (!empty($new_user_ids)) {
-					$user_ids = $new_user_ids;
-				} else {
-					break;
+				break;
+			}
+			else {
+				$values = [];
+				$placeholders = [];
+				foreach ($user_ids as $user_id) {
+					$values[] = $user_id;
+					$placeholders[] = "(%d)";
 				}
+				$query = "INSERT INTO $table_recipients (user_id) VALUES " . implode(',', $placeholders);
+				$wpdb->query($wpdb->prepare($query, ...$values));
+				$total_users += count($user_ids);
 			}
-			$values = [];
-			$placeholders = [];
-			foreach ($user_ids as $user_id) {
-				$values[] = $user_id;
-				$placeholders[] = "(%d)";
-			}
-			$query = "INSERT INTO $table_recipients (user_id) VALUES " . implode(',', $placeholders);
-			$wpdb->query($wpdb->prepare($query, ...$values));
-			$total_users += count($user_ids);
 			$page++;
 		} while (count($user_ids) >= 10000);
 	}
 	else if (!empty($group_ids)) {
 		do {
 			$user_ids = wp_simple_mass_email_get_user_ids_by_group_ids($group_ids, 10000, $page);
-			if (empty($user_ids)) {
-				$new_user_ids = wp_simple_mass_email_get_user_ids_by_group_ids($group_ids, 10000, $page + 1);
-				if (!empty($new_user_ids)) {
-					$user_ids = $new_user_ids;
-				} else {
-					break;
-				}
-			}
 			$insert_user_ids = [];
-			if ($unlogged_only) {
+			if (empty($user_ids)) {
+				break;
+			}
+			else if ($unlogged_only) {
 				$wp_user_query = new WP_User_Query([
 					'include'    => $user_ids,
 					'fields'     => 'ID',
@@ -540,6 +536,7 @@ function wp_simple_mass_email_perform_send_email() {
 					]
 				]);
 				$insert_user_ids = $wp_user_query->get_results();
+				$insert_user_ids = array_unique($insert_user_ids, SORT_NUMERIC);
 			}
 			else {
 				$insert_user_ids = $user_ids;
@@ -584,7 +581,7 @@ function wp_simple_mass_email_send_email_cron() {
 		wp_clear_scheduled_hook('wp_simple_mass_email_email_send');
 		return;
 	}
-	$contains_resetpass_url = strpos($current_job->body, '{resetpass_url}') !== false;
+	$contains_resetpass_url = str_contains((string) ($current_job->body ?? ''), '{resetpass_url}');
 	$usleep_time = (int) ((60 / $current_job->batch_size) * 1000000);
 	foreach ($recipients as $recipient) {
 		$user = get_userdata($recipient->user_id);
@@ -598,15 +595,15 @@ function wp_simple_mass_email_send_email_cron() {
 			$subject = str_replace(
 				['{user_login}', '{site_title}'],
 				[$user->user_login, $site_title],
-				$current_job->subject
+				(string) ($current_job->subject ?? '')
 			);
 			$body = str_replace(
 				['{user_login}', '{user_email}', '{login_url}', '{home_url}', '{site_title}'],
 				[$user->user_login, $user->user_email, esc_url($login_url), esc_url($home_url), $site_title],
-				$current_job->body
+				(string) ($current_job->body ?? '')
 			);
 			if (isset($profile_url)) {
-				$body = str_replace('{profile_url}', esc_url($profile_url), $body);
+				$body = str_replace('{profile_url}', esc_url($profile_url), (string) ($body ?? ''));
 			}
 			if ($contains_resetpass_url) {
 				$key = get_password_reset_key($user);
@@ -618,7 +615,7 @@ function wp_simple_mass_email_send_email_cron() {
 					],
 					$login_url
 				);
-				$body = str_replace('{resetpass_url}', esc_url($resetpass_url), $body);
+				$body = str_replace('{resetpass_url}', esc_url($resetpass_url), (string) ($body ?? ''));
 			}
 			wp_mail($user->user_email, $subject, $body);
 			usleep($usleep_time);
@@ -636,8 +633,9 @@ add_action('wp_simple_mass_email_email_send', 'wp_simple_mass_email_send_email_c
 
 // Get users by roles
 function wp_simple_mass_email_get_user_ids_by_roles($roles, $unlogged_only, $batch_size = 10000, $page = 1) {
+	$roles = array_unique($roles);
 	$args = [
-		'role__in'  => empty($roles) ? null : $roles,
+		'role__in'  => $roles,
 		'fields'    => 'ID',
 		'number'    => $batch_size,
 		'paged'     => $page,
@@ -655,11 +653,13 @@ function wp_simple_mass_email_get_user_ids_by_roles($roles, $unlogged_only, $bat
 	if (empty($user_ids)) {
 		return [];
 	}
+	$user_ids = array_unique($user_ids, SORT_NUMERIC);
 	return $user_ids;
 }
 
 // Get users by groups
 function wp_simple_mass_email_get_user_ids_by_group_ids($group_ids, $batch_size = 10000, $page = 1) {
+	$group_ids = array_unique($group_ids, SORT_NUMERIC);
 	$args = [
 		'group_id'  => $group_ids,
 		'per_page'  => $batch_size,
@@ -670,6 +670,7 @@ function wp_simple_mass_email_get_user_ids_by_group_ids($group_ids, $batch_size 
 	if (empty($user_ids)) {
 		return [];
 	}
+	$user_ids = array_unique($user_ids, SORT_NUMERIC);
 	return $user_ids;
 }
 
